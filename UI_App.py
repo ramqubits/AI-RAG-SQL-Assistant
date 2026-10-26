@@ -103,3 +103,8 @@ if question:
         {"role": "assistant", "content": answer, "steps": collected_steps}
     )
     st.rerun()  # refresh sidebar usage counter
+
+#How to Run the Streamlit App
+# 1. Save this code in a file named `ui_app.py`.    
+# 2. Open a terminal and navigate to the directory where `ui_app.py` is located.
+# 3. Run the command: `streamlit run ui_app.py`.
