@@ -217,10 +217,11 @@ def investigate(question, max_iterations=10, working_memory=None, on_step=None):
         except RuntimeError as e:
             print(f"\n--- Investigation stopped: {e} ---")
             fallback_text = get_fallback_result_text()
+            error_detail = str(e)[:600]  # keep the real cause visible, but bounded
             final_answer = (
-                f"(investigation stopped due to API failure)\n{fallback_text}"
+                f"(investigation stopped due to API failure)\n{fallback_text}\n\nError: {error_detail}"
                 if fallback_text
-                else "(investigation stopped due to API failure, no partial results available)"
+                else f"(investigation stopped due to API failure, no partial results available)\n\nError: {error_detail}"
             )
             save_to_history(question, final_answer, None)
             return final_answer, contents
