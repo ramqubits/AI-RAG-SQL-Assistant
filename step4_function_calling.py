@@ -66,11 +66,56 @@ def get_api_usage_today():
 
 
 # ---- Connections ----
+# On hosted platforms (e.g. Streamlit Cloud) files checked out from GitHub can
+# be read-only, which makes SQLite fail with "attempt to write a readonly
+# database" as soon as the agent saves history. If a data file/folder isn't
+# writable, we transparently use a copy in the system temp directory instead.
+# (That copy is ephemeral: it resets whenever the hosted app restarts.)
 
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+import shutil
+import tempfile
+
+
+def _is_writable(path):
+    try:
+        if os.path.isdir(path):
+            probe_dir = path
+            files = [os.path.join(path, "chroma.sqlite3")]
+        else:
+            probe_dir = os.path.dirname(os.path.abspath(path))
+            files = [path]
+        probe = os.path.join(probe_dir, ".write_test")
+        with open(probe, "w") as f:
+            f.write("x")
+        os.remove(probe)
+        return all(os.access(f, os.W_OK) for f in files if os.path.exists(f))
+    except OSError:
+        return False
+
+
+def writable_path(path):
+    """Return `path` if it's writable, else a writable temp copy of it."""
+    if _is_writable(path):
+        return path
+    abs_path = os.path.abspath(path)
+    target = os.path.join(tempfile.gettempdir(), "agent_data", os.path.basename(abs_path))
+    if not os.path.exists(target):
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.isdir(abs_path):
+            shutil.copytree(abs_path, target)
+        else:
+            shutil.copy2(abs_path, target)
+        for root, dirs, files in os.walk(target):  # copies can inherit read-only bits
+            for name in files:
+                os.chmod(os.path.join(root, name), 0o644)
+    logger.warning(f"{path} is read-only here; using writable copy at {target}")
+    return target
+
+
+chroma_client = chromadb.PersistentClient(path=writable_path("./chroma_db"))
 collection = chroma_client.get_or_create_collection(name="sql_knowledge")
 
-conn = sqlite3.connect("sql_assistant.db", check_same_thread=False)  # Streamlit reruns scripts on varying threads
+conn = sqlite3.connect(writable_path("sql_assistant.db"), check_same_thread=False)  # Streamlit reruns scripts on varying threads
 cursor = conn.cursor()
 
 client = genai.Client(
@@ -78,7 +123,8 @@ client = genai.Client(
     http_options=types.HttpOptions(api_version="v1beta"),
 )
 
-MODEL = "gemini-3.1-flash-lite" # "gemini-3.8-flash"
+MODEL = "gemini-3.8-flash"
+#MODEL = "gemini-3.1-flash-lite" # "gemini-3.8-flash"
 
 call_counts = {}
 last_result = {}
@@ -272,12 +318,17 @@ def load_recent_history(limit=HISTORY_LIMIT):
 # ---- Save this exchange to the database ----
 
 def save_to_history(question, final_answer, sql_used):
-    cursor.execute(
-        "INSERT INTO conversation_history (question, final_answer, sql_used) "
-        "VALUES (?, ?, ?)",
-        (question, final_answer, sql_used),
-    )
-    conn.commit()
+    # History is a convenience, not the answer itself - if saving fails
+    # (read-only storage, locked file, etc.) log it and carry on.
+    try:
+        cursor.execute(
+            "INSERT INTO conversation_history (question, final_answer, sql_used) "
+            "VALUES (?, ?, ?)",
+            (question, final_answer, sql_used),
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        logger.warning(f"Could not save conversation history: {e}")
 
 
 # ---- The agent loop ----
