@@ -25,6 +25,11 @@ if "working_memory" not in st.session_state:
     st.session_state.working_memory = None
 
 
+def safe_md(text):
+    """Escape $ so Streamlit doesn't treat dollar amounts as LaTeX math."""
+    return text.replace("$", "\\$")
+
+
 def render_steps(steps):
     """Show a list of tool-call steps (used both live and for history replay)."""
     for step in steps:
@@ -65,7 +70,7 @@ st.caption("Ask a business question. The agent investigates with tools and expla
 # Replay history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        st.markdown(safe_md(msg["content"]))
         if msg.get("steps"):
             with st.expander(f"How the agent got here ({len(msg['steps'])} tool calls)"):
                 render_steps(msg["steps"])
@@ -75,7 +80,7 @@ question = st.chat_input("e.g. Why did average transaction value change from Jun
 if question:
     st.session_state.messages.append({"role": "user", "content": question, "steps": []})
     with st.chat_message("user"):
-        st.markdown(question)
+        st.markdown(safe_md(question))
 
     with st.chat_message("assistant"):
         collected_steps = []
@@ -97,7 +102,7 @@ if question:
                 answer = f"Something went wrong while investigating: `{e}`"
                 status.update(label="Failed", state="error")
 
-        st.markdown(answer)
+        st.markdown(safe_md(answer))
 
     st.session_state.messages.append(
         {"role": "assistant", "content": answer, "steps": collected_steps}

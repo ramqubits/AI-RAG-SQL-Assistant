@@ -150,6 +150,10 @@ Process:
    looks broad-based") rather than forcing a causal story onto a weak signal.
 3. Use analyze_results whenever you're comparing two numbers (a period-over-period
    change, a before/after) - never estimate a percentage yourself, always call the tool.
+   This applies to EVERY percentage you state in your final answer, including
+   secondary metrics (e.g. if you compare transaction counts AND total amounts, call
+   analyze_results once for each pair). If you haven't called the tool for a pair of
+   numbers, state the two numbers and the plain difference, but do not state a percentage.
 4. If analyze_results reports "significant": true (change >= {threshold}%), do NOT
    stop there. Decide what breakdown would explain it (by category, region, product,
    customer segment - whatever the schema supports) and run another generate_sql +
