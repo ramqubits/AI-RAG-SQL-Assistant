@@ -140,7 +140,7 @@ HISTORY_LIMIT = 5  # how many past exchanges to load as context
 
 def search_schema(question):
     try:
-        results = collection.query(query_texts=[question], n_results=5)
+        results = collection.query(query_texts=[question], n_results=max(1, min(collection.count(), 12)))
     except Exception as e:
         return f"SEARCH_ERROR: could not search schema ({e})"
 
@@ -153,7 +153,7 @@ def search_schema(question):
 
 def search_business_rules(question):
     try:
-        results = collection.query(query_texts=[question], n_results=5)
+        results = collection.query(query_texts=[question], n_results=max(1, min(collection.count(), 12)))
     except Exception as e:
         return f"SEARCH_ERROR: could not search business rules ({e})"
 
